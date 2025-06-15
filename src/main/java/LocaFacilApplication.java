@@ -543,6 +543,17 @@ public class LocaFacilApplication extends JFrame {
     private void excluirVeiculo() {
         int linhaSelecionada = tabelaVeiculos.getSelectedRow();
         if (linhaSelecionada >= 0) {
+            // Obter status do veículo selecionado
+            StatusVeiculo status = (StatusVeiculo) modeloTabelaVeiculos.getValueAt(linhaSelecionada, 7);
+
+            // Verificar se o veículo está alugado ou reservado
+            if (status == StatusVeiculo.ALUGADO || status == StatusVeiculo.RESERVADO) {
+                JOptionPane.showMessageDialog(this, 
+                    "Não é possível excluir um veículo que está alugado ou reservado.", 
+                    "Operação não permitida", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
             // Confirmar exclusão
             int resposta = JOptionPane.showConfirmDialog(this,
                 "Tem certeza que deseja excluir o veículo selecionado?",

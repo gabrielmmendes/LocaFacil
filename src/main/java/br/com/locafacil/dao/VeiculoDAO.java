@@ -5,7 +5,6 @@ import br.com.locafacil.model.Veiculo;
 import br.com.locafacil.model.StatusVeiculo;
 
 import java.sql.*;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -97,16 +96,35 @@ public class VeiculoDAO {
         }
     }
 
-    public void excluir(long id) {
-        String sql = "DELETE FROM veiculo WHERE idVeiculo=?";
+    public void excluir(long id) throws Exception {
+        // Verificar se o veículo está alugado ou reservado antes de excluir
+        String sqlCheck = "SELECT status FROM veiculo WHERE idVeiculo=?";
         try (Connection conn = ConexaoSQLite.conectar()) {
             assert conn != null;
+
+            // Primeiro, verificar o status do veículo
+            try (PreparedStatement pstmtCheck = conn.prepareStatement(sqlCheck)) {
+                pstmtCheck.setLong(1, id);
+                try (ResultSet rs = pstmtCheck.executeQuery()) {
+                    if (rs.next()) {
+                        String status = rs.getString("status");
+                        if (status.equals(StatusVeiculo.ALUGADO.name()) || 
+                            status.equals(StatusVeiculo.RESERVADO.name())) {
+                            throw new Exception("Não é possível excluir um veículo que está alugado ou reservado.");
+                        }
+                    }
+                }
+            }
+
+            // Se chegou aqui, pode excluir o veículo
+            String sql = "DELETE FROM veiculo WHERE idVeiculo=?";
             try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
                 pstmt.setLong(1, id);
                 pstmt.executeUpdate();
             }
         } catch (SQLException e) {
             e.printStackTrace();
+            throw new Exception("Erro ao excluir veículo: " + e.getMessage());
         }
     }
 }
