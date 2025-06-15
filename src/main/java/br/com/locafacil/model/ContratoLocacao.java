@@ -56,6 +56,7 @@ public class ContratoLocacao {
 
     public BigDecimal calcularValorParcial() {
         long dias = java.time.temporal.ChronoUnit.DAYS.between(dataInicioPrevista, dataFimPrevista);
+        if (dias == 0) dias = 1; // Mínimo de 1 dia
         valorParcial = valorDiarioContratado.multiply(BigDecimal.valueOf(dias));
         return valorParcial;
     }
