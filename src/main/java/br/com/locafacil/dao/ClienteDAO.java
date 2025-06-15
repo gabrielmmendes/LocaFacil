@@ -87,17 +87,31 @@ public class ClienteDAO {
         }
     }
 
-    public void excluir(long id) {
-        String sql = "DELETE FROM cliente WHERE idCliente=?";
+    public void excluir(long id) throws Exception {
+        // Verificar se o cliente possui contratos ativos antes de excluir
+        String sqlCheck = "SELECT COUNT(*) FROM contrato_locacao WHERE idCliente=? AND statusContrato IN ('RESERVA', 'ATIVO')";
         try (Connection conn = ConexaoSQLite.conectar()) {
             assert conn != null;
+
+            // Primeiro, verificar se o cliente tem contratos ativos
+            try (PreparedStatement pstmtCheck = conn.prepareStatement(sqlCheck)) {
+                pstmtCheck.setLong(1, id);
+                try (ResultSet rs = pstmtCheck.executeQuery()) {
+                    if (rs.next() && rs.getInt(1) > 0) {
+                        throw new Exception("Não é possível excluir um cliente que possui contrato de locação ativo.");
+                    }
+                }
+            }
+
+            // Se chegou aqui, pode excluir o cliente
+            String sql = "DELETE FROM cliente WHERE idCliente=?";
             try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
                 pstmt.setLong(1, id);
                 pstmt.executeUpdate();
             }
         } catch (SQLException e) {
             e.printStackTrace();
+            throw new Exception("Erro ao excluir cliente: " + e.getMessage());
         }
     }
 }
-

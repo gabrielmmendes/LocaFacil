@@ -205,6 +205,18 @@ public class LocaFacilApplication extends JFrame {
         tabelaReservas = new JTable(modeloTabelaReservas);
         painelReservas.add(new JScrollPane(tabelaReservas), BorderLayout.CENTER);
 
+        // Painel de botões para operações com reservas
+        JPanel painelBotoesReserva = new JPanel();
+        JButton btnRegistrarRetirada = new JButton("Registrar Retirada");
+        JButton btnCancelarReserva = new JButton("Cancelar Reserva");
+        painelBotoesReserva.add(btnRegistrarRetirada);
+        painelBotoesReserva.add(btnCancelarReserva);
+        painelReservas.add(painelBotoesReserva, BorderLayout.SOUTH);
+
+        // Configurar listeners para os novos botões
+        btnRegistrarRetirada.addActionListener(e -> registrarRetiradaVeiculo());
+        btnCancelarReserva.addActionListener(e -> cancelarReserva());
+
         // Adicionar painéis ao tabbedPane
         tabbedPane.addTab("Clientes", painelClientes);
         tabbedPane.addTab("Veículos", painelVeiculos);
@@ -621,6 +633,128 @@ public class LocaFacilApplication extends JFrame {
         } else {
             JOptionPane.showMessageDialog(this, 
                 "Selecione uma reserva na tabela para excluir.", 
+                "Aviso", JOptionPane.WARNING_MESSAGE);
+        }
+    }
+
+    /**
+     * Registra a retirada de um veículo pelo cliente, atualizando a quilometragem inicial,
+     * a data de retirada, e alterando o status do contrato para ATIVO e do veículo para ALUGADO.
+     */
+    private void registrarRetiradaVeiculo() {
+        int linhaSelecionada = tabelaReservas.getSelectedRow();
+        if (linhaSelecionada >= 0) {
+            // Verificar se o contrato está no status RESERVA
+            String statusContrato = modeloTabelaReservas.getValueAt(linhaSelecionada, 7).toString();
+            if (!statusContrato.equals("RESERVA")) {
+                JOptionPane.showMessageDialog(this, 
+                    "Apenas contratos com status RESERVA podem ter a retirada registrada.", 
+                    "Operação não permitida", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            // Obter ID do contrato selecionado
+            Long idContrato = (Long) modeloTabelaReservas.getValueAt(linhaSelecionada, 0);
+
+            // Solicitar a quilometragem inicial
+            String quilometragemStr = JOptionPane.showInputDialog(this, 
+                "Informe a quilometragem atual do veículo:", 
+                "Registrar Retirada", JOptionPane.QUESTION_MESSAGE);
+
+            if (quilometragemStr == null || quilometragemStr.trim().isEmpty()) {
+                // Usuário cancelou ou não informou a quilometragem
+                return;
+            }
+
+            try {
+                // Converter e validar a quilometragem
+                int quilometragemInicial = Integer.parseInt(quilometragemStr);
+                if (quilometragemInicial < 0) {
+                    throw new NumberFormatException("Quilometragem não pode ser negativa");
+                }
+
+                // Confirmar a operação
+                int resposta = JOptionPane.showConfirmDialog(this,
+                    "Confirma a retirada do veículo com quilometragem " + quilometragemInicial + "?",
+                    "Confirmar Retirada", JOptionPane.YES_NO_OPTION);
+
+                if (resposta == JOptionPane.YES_OPTION) {
+                    // Registrar a retirada
+                    boolean sucesso = contratoLocacaoDAO.registrarRetirada(idContrato, quilometragemInicial);
+
+                    if (sucesso) {
+                        // Atualizar tabelas e combos
+                        carregarReservas();
+                        carregarVeiculos(); // Atualizar lista de veículos (status alterado para ALUGADO)
+                        carregarCombosReserva();
+
+                        JOptionPane.showMessageDialog(this, 
+                            "Retirada do veículo registrada com sucesso!", 
+                            "Sucesso", JOptionPane.INFORMATION_MESSAGE);
+                    } else {
+                        JOptionPane.showMessageDialog(this, 
+                            "Não foi possível registrar a retirada do veículo.", 
+                            "Erro", JOptionPane.ERROR_MESSAGE);
+                    }
+                }
+            } catch (NumberFormatException e) {
+                JOptionPane.showMessageDialog(this, 
+                    "Quilometragem inválida. Informe um número inteiro positivo.", 
+                    "Erro de Validação", JOptionPane.ERROR_MESSAGE);
+            }
+        } else {
+            JOptionPane.showMessageDialog(this, 
+                "Selecione uma reserva na tabela para registrar a retirada.", 
+                "Aviso", JOptionPane.WARNING_MESSAGE);
+        }
+    }
+
+    /**
+     * Cancela uma reserva, alterando o status do contrato para CANCELADO
+     * e o status do veículo para DISPONIVEL.
+     */
+    private void cancelarReserva() {
+        int linhaSelecionada = tabelaReservas.getSelectedRow();
+        if (linhaSelecionada >= 0) {
+            // Verificar se o contrato está no status RESERVA
+            String statusContrato = modeloTabelaReservas.getValueAt(linhaSelecionada, 7).toString();
+            if (!statusContrato.equals("RESERVA")) {
+                JOptionPane.showMessageDialog(this, 
+                    "Apenas contratos com status RESERVA podem ser cancelados.", 
+                    "Operação não permitida", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            // Obter ID do contrato selecionado
+            Long idContrato = (Long) modeloTabelaReservas.getValueAt(linhaSelecionada, 0);
+
+            // Confirmar o cancelamento
+            int resposta = JOptionPane.showConfirmDialog(this,
+                "Tem certeza que deseja cancelar a reserva selecionada?",
+                "Confirmar Cancelamento", JOptionPane.YES_NO_OPTION);
+
+            if (resposta == JOptionPane.YES_OPTION) {
+                // Cancelar a reserva
+                boolean sucesso = contratoLocacaoDAO.cancelarReserva(idContrato);
+
+                if (sucesso) {
+                    // Atualizar tabelas e combos
+                    carregarReservas();
+                    carregarVeiculos(); // Atualizar lista de veículos (status alterado para DISPONIVEL)
+                    carregarCombosReserva(); // Atualizar combos (veículo disponível novamente)
+
+                    JOptionPane.showMessageDialog(this, 
+                        "Reserva cancelada com sucesso!", 
+                        "Sucesso", JOptionPane.INFORMATION_MESSAGE);
+                } else {
+                    JOptionPane.showMessageDialog(this, 
+                        "Não foi possível cancelar a reserva.", 
+                        "Erro", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        } else {
+            JOptionPane.showMessageDialog(this, 
+                "Selecione uma reserva na tabela para cancelar.", 
                 "Aviso", JOptionPane.WARNING_MESSAGE);
         }
     }

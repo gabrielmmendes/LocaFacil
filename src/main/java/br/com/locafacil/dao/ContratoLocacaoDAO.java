@@ -4,6 +4,7 @@ import br.com.locafacil.config.ConexaoSQLite;
 import br.com.locafacil.model.Cliente;
 import br.com.locafacil.model.ContratoLocacao;
 import br.com.locafacil.model.StatusContrato;
+import br.com.locafacil.model.StatusVeiculo;
 import br.com.locafacil.model.Veiculo;
 
 import java.sql.*;
@@ -184,6 +185,126 @@ public class ContratoLocacaoDAO {
         return false; // Em caso de erro, considerar indisponível por segurança
     }
 
+    /**
+     * Registra a retirada do veículo pelo cliente, atualizando a quilometragem inicial,
+     * a data de retirada, e alterando o status do contrato para ATIVO e do veículo para ALUGADO.
+     * 
+     * @param idContrato ID do contrato
+     * @param quilometragemInicial Quilometragem inicial do veículo no momento da retirada
+     * @return true se a operação foi bem-sucedida, false caso contrário
+     */
+    public boolean registrarRetirada(long idContrato, int quilometragemInicial) {
+        String sql = "UPDATE contrato_locacao SET dataRetirada=?, quilometragemInicial=?, statusContrato=? WHERE idContrato=? AND statusContrato=?";
+        try (Connection conn = ConexaoSQLite.conectar()) {
+            assert conn != null;
+
+            // Primeiro, verificar se o contrato existe e está no status RESERVA
+            String sqlCheck = "SELECT idVeiculo FROM contrato_locacao WHERE idContrato=? AND statusContrato=?";
+            long idVeiculo = -1;
+
+            try (PreparedStatement pstmtCheck = conn.prepareStatement(sqlCheck)) {
+                pstmtCheck.setLong(1, idContrato);
+                pstmtCheck.setString(2, StatusContrato.RESERVA.name());
+                try (ResultSet rs = pstmtCheck.executeQuery()) {
+                    if (rs.next()) {
+                        idVeiculo = rs.getLong("idVeiculo");
+                    } else {
+                        // Contrato não encontrado ou não está no status RESERVA
+                        return false;
+                    }
+                }
+            }
+
+            // Atualizar o contrato
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                LocalDateTime agora = LocalDateTime.now();
+                pstmt.setString(1, agora.toString());
+                pstmt.setInt(2, quilometragemInicial);
+                pstmt.setString(3, StatusContrato.ATIVO.name());
+                pstmt.setLong(4, idContrato);
+                pstmt.setString(5, StatusContrato.RESERVA.name());
+
+                int linhasAfetadas = pstmt.executeUpdate();
+                if (linhasAfetadas == 0) {
+                    // Nenhum contrato foi atualizado
+                    return false;
+                }
+            }
+
+            // Atualizar o status do veículo para ALUGADO
+            if (idVeiculo != -1) {
+                Veiculo veiculo = obterVeiculo(idVeiculo);
+                if (veiculo != null) {
+                    veiculo.setStatus(StatusVeiculo.ALUGADO);
+                    veiculoDAO.atualizar(veiculo);
+                }
+            }
+
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Cancela uma reserva, alterando o status do contrato para CANCELADO
+     * e o status do veículo para DISPONIVEL.
+     * 
+     * @param idContrato ID do contrato a ser cancelado
+     * @return true se a operação foi bem-sucedida, false caso contrário
+     */
+    public boolean cancelarReserva(long idContrato) {
+        String sql = "UPDATE contrato_locacao SET statusContrato=? WHERE idContrato=? AND statusContrato=?";
+        try (Connection conn = ConexaoSQLite.conectar()) {
+            assert conn != null;
+
+            // Primeiro, verificar se o contrato existe e está no status RESERVA
+            String sqlCheck = "SELECT idVeiculo FROM contrato_locacao WHERE idContrato=? AND statusContrato=?";
+            long idVeiculo = -1;
+
+            try (PreparedStatement pstmtCheck = conn.prepareStatement(sqlCheck)) {
+                pstmtCheck.setLong(1, idContrato);
+                pstmtCheck.setString(2, StatusContrato.RESERVA.name());
+                try (ResultSet rs = pstmtCheck.executeQuery()) {
+                    if (rs.next()) {
+                        idVeiculo = rs.getLong("idVeiculo");
+                    } else {
+                        // Contrato não encontrado ou não está no status RESERVA
+                        return false;
+                    }
+                }
+            }
+
+            // Atualizar o contrato
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, StatusContrato.CANCELADO.name());
+                pstmt.setLong(2, idContrato);
+                pstmt.setString(3, StatusContrato.RESERVA.name());
+
+                int linhasAfetadas = pstmt.executeUpdate();
+                if (linhasAfetadas == 0) {
+                    // Nenhum contrato foi atualizado
+                    return false;
+                }
+            }
+
+            // Atualizar o status do veículo para DISPONIVEL
+            if (idVeiculo != -1) {
+                Veiculo veiculo = obterVeiculo(idVeiculo);
+                if (veiculo != null) {
+                    veiculo.setStatus(StatusVeiculo.DISPONIVEL);
+                    veiculoDAO.atualizar(veiculo);
+                }
+            }
+
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
     public void excluir(long id) {
         // Primeiro, obter o contrato para verificar o veículo associado
         String sqlSelect = "SELECT idVeiculo, statusContrato FROM contrato_locacao WHERE idContrato=?";
@@ -215,7 +336,7 @@ public class ContratoLocacaoDAO {
                                     StatusContrato.ATIVO.name().equals(statusContrato))) {
                 Veiculo veiculo = obterVeiculo(idVeiculo);
                 if (veiculo != null) {
-                    veiculo.setStatus(br.com.locafacil.model.StatusVeiculo.DISPONIVEL);
+                    veiculo.setStatus(StatusVeiculo.DISPONIVEL);
                     veiculoDAO.atualizar(veiculo);
                 }
             }
