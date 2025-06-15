@@ -7,16 +7,185 @@ import br.com.locafacil.model.StatusContrato;
 import br.com.locafacil.model.StatusVeiculo;
 import br.com.locafacil.model.Veiculo;
 
+import java.math.BigDecimal;
 import java.sql.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class ContratoLocacaoDAO {
 
     private ClienteDAO clienteDAO = new ClienteDAO();
     private VeiculoDAO veiculoDAO = new VeiculoDAO();
+
+    /**
+     * Lista todas as locações ativas (status = RESERVA ou ATIVO).
+     * 
+     * @return Lista de contratos ativos
+     */
+    public List<ContratoLocacao> listarLocacoesAtivas() {
+        List<ContratoLocacao> lista = new ArrayList<>();
+        String sql = "SELECT * FROM contrato_locacao WHERE statusContrato IN (?, ?)";
+        try (Connection conn = ConexaoSQLite.conectar()) {
+            assert conn != null;
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, StatusContrato.RESERVA.name());
+                pstmt.setString(2, StatusContrato.ATIVO.name());
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    while (rs.next()) {
+                        // Obter cliente e veículo
+                        Cliente cliente = obterCliente(rs.getLong("idCliente"));
+                        Veiculo veiculo = obterVeiculo(rs.getLong("idVeiculo"));
+
+                        if (cliente != null && veiculo != null) {
+                            // Criar contrato
+                            ContratoLocacao contrato = new ContratoLocacao(
+                                    rs.getLong("idContrato"),
+                                    cliente,
+                                    veiculo,
+                                    LocalDate.parse(rs.getString("dataInicioPrevista")),
+                                    LocalDate.parse(rs.getString("dataFimPrevista")),
+                                    rs.getInt("quilometragemInicial"),
+                                    rs.getBigDecimal("valorDiarioContratado")
+                            );
+
+                            // Definir status
+                            contrato.setStatusContrato(StatusContrato.valueOf(rs.getString("statusContrato")));
+
+                            // Definir campos opcionais se não forem nulos
+                            if (rs.getString("dataRetirada") != null) {
+                                contrato.setDataRetirada(LocalDateTime.parse(rs.getString("dataRetirada")));
+                            }
+                            if (rs.getString("dataDevolucao") != null) {
+                                contrato.setDataDevolucao(LocalDateTime.parse(rs.getString("dataDevolucao")));
+                            }
+                            if (rs.getObject("quilometragemFinal") != null) {
+                                contrato.setQuilometragemFinal(rs.getInt("quilometragemFinal"));
+                            }
+
+                            lista.add(contrato);
+                        }
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return lista;
+    }
+
+    /**
+     * Lista o histórico de locações de um cliente específico.
+     * 
+     * @param idCliente ID do cliente
+     * @return Lista de contratos do cliente
+     */
+    public List<ContratoLocacao> listarHistoricoCliente(long idCliente) {
+        List<ContratoLocacao> lista = new ArrayList<>();
+        String sql = "SELECT * FROM contrato_locacao WHERE idCliente = ?";
+        try (Connection conn = ConexaoSQLite.conectar()) {
+            assert conn != null;
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setLong(1, idCliente);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    while (rs.next()) {
+                        // Obter cliente e veículo
+                        Cliente cliente = obterCliente(rs.getLong("idCliente"));
+                        Veiculo veiculo = obterVeiculo(rs.getLong("idVeiculo"));
+
+                        if (cliente != null && veiculo != null) {
+                            // Criar contrato
+                            ContratoLocacao contrato = new ContratoLocacao(
+                                    rs.getLong("idContrato"),
+                                    cliente,
+                                    veiculo,
+                                    LocalDate.parse(rs.getString("dataInicioPrevista")),
+                                    LocalDate.parse(rs.getString("dataFimPrevista")),
+                                    rs.getInt("quilometragemInicial"),
+                                    rs.getBigDecimal("valorDiarioContratado")
+                            );
+
+                            // Definir status
+                            contrato.setStatusContrato(StatusContrato.valueOf(rs.getString("statusContrato")));
+
+                            // Definir campos opcionais se não forem nulos
+                            if (rs.getString("dataRetirada") != null) {
+                                contrato.setDataRetirada(LocalDateTime.parse(rs.getString("dataRetirada")));
+                            }
+                            if (rs.getString("dataDevolucao") != null) {
+                                contrato.setDataDevolucao(LocalDateTime.parse(rs.getString("dataDevolucao")));
+                            }
+                            if (rs.getObject("quilometragemFinal") != null) {
+                                contrato.setQuilometragemFinal(rs.getInt("quilometragemFinal"));
+                            }
+                            // Não podemos definir diretamente os valores de multas, extras e total
+                            // pois a classe ContratoLocacao não tem setters para esses campos
+                            // Os valores serão obtidos pelos getters quando necessário
+
+                            lista.add(contrato);
+                        }
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return lista;
+    }
+
+    /**
+     * Gera um relatório de faturamento para um período específico.
+     * Considera apenas contratos encerrados.
+     * 
+     * @param dataInicio Data de início do período
+     * @param dataFim Data de fim do período
+     * @return Mapa com valores de faturamento (valorBruto, valorMultas, valorExtras, valorTotal)
+     */
+    public Map<String, BigDecimal> gerarRelatorioFaturamento(LocalDate dataInicio, LocalDate dataFim) {
+        Map<String, BigDecimal> resultado = new HashMap<>();
+        BigDecimal valorBruto = BigDecimal.ZERO;
+        BigDecimal valorMultas = BigDecimal.ZERO;
+        BigDecimal valorExtras = BigDecimal.ZERO;
+        BigDecimal valorTotal = BigDecimal.ZERO;
+
+        String sql = "SELECT valorParcial, valorMultas, valorExtras, valorTotal FROM contrato_locacao " +
+                     "WHERE statusContrato = ? AND dataDevolucao BETWEEN ? AND ?";
+
+        try (Connection conn = ConexaoSQLite.conectar()) {
+            assert conn != null;
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, StatusContrato.ENCERRADO.name());
+                pstmt.setString(2, dataInicio.atStartOfDay().toString());
+                pstmt.setString(3, dataFim.plusDays(1).atStartOfDay().minusNanos(1).toString());
+
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    while (rs.next()) {
+                        BigDecimal parcial = rs.getBigDecimal("valorParcial");
+                        BigDecimal multas = rs.getBigDecimal("valorMultas");
+                        BigDecimal extras = rs.getBigDecimal("valorExtras");
+                        BigDecimal total = rs.getBigDecimal("valorTotal");
+
+                        if (parcial != null) valorBruto = valorBruto.add(parcial);
+                        if (multas != null) valorMultas = valorMultas.add(multas);
+                        if (extras != null) valorExtras = valorExtras.add(extras);
+                        if (total != null) valorTotal = valorTotal.add(total);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        resultado.put("valorBruto", valorBruto);
+        resultado.put("valorMultas", valorMultas);
+        resultado.put("valorExtras", valorExtras);
+        resultado.put("valorTotal", valorTotal);
+
+        return resultado;
+    }
 
     public void criarTabela() {
         String sql = "CREATE TABLE IF NOT EXISTS contrato_locacao (" +
@@ -35,6 +204,7 @@ public class ContratoLocacaoDAO {
                 "valorExtras REAL," +
                 "valorTotal REAL," +
                 "statusContrato TEXT NOT NULL," +
+                "observacoesDanos TEXT," +
                 "FOREIGN KEY (idCliente) REFERENCES cliente(idCliente)," +
                 "FOREIGN KEY (idVeiculo) REFERENCES veiculo(idVeiculo))";
         try (Connection conn = ConexaoSQLite.conectar()) {
@@ -281,6 +451,123 @@ public class ContratoLocacaoDAO {
                 pstmt.setString(1, StatusContrato.CANCELADO.name());
                 pstmt.setLong(2, idContrato);
                 pstmt.setString(3, StatusContrato.RESERVA.name());
+
+                int linhasAfetadas = pstmt.executeUpdate();
+                if (linhasAfetadas == 0) {
+                    // Nenhum contrato foi atualizado
+                    return false;
+                }
+            }
+
+            // Atualizar o status do veículo para DISPONIVEL
+            if (idVeiculo != -1) {
+                Veiculo veiculo = obterVeiculo(idVeiculo);
+                if (veiculo != null) {
+                    veiculo.setStatus(StatusVeiculo.DISPONIVEL);
+                    veiculoDAO.atualizar(veiculo);
+                }
+            }
+
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Registra a devolução do veículo, atualizando a quilometragem final, a data de devolução,
+     * calculando multas por atraso e quilometragem excedente, e alterando o status do contrato
+     * para ENCERRADO e do veículo para DISPONIVEL.
+     * 
+     * @param idContrato ID do contrato
+     * @param quilometragemFinal Quilometragem final do veículo no momento da devolução
+     * @param observacoesDanos Observações sobre danos no veículo (opcional)
+     * @param valorDiarioMultaAtraso Valor diário da multa por atraso (se houver)
+     * @param valorPorKmExcedente Valor por km excedente (se houver)
+     * @return true se a operação foi bem-sucedida, false caso contrário
+     */
+    public boolean registrarDevolucao(long idContrato, int quilometragemFinal, String observacoesDanos, 
+                                     BigDecimal valorDiarioMultaAtraso, BigDecimal valorPorKmExcedente) {
+        // Usar uma SQL query que não inclui a coluna observacoesDanos para evitar problemas
+        // com bancos de dados existentes que podem não ter essa coluna
+        String sql = "UPDATE contrato_locacao SET dataDevolucao=?, quilometragemFinal=?, " +
+                     "valorMultas=?, valorExtras=?, valorTotal=?, statusContrato=? " +
+                     "WHERE idContrato=? AND statusContrato=?";
+
+        // Nota: As observações de danos serão armazenadas apenas no objeto ContratoLocacao
+        // e não no banco de dados nesta versão
+        try (Connection conn = ConexaoSQLite.conectar()) {
+            assert conn != null;
+
+            // Primeiro, verificar se o contrato existe e está no status ATIVO
+            String sqlCheck = "SELECT idVeiculo, idCliente, dataInicioPrevista, dataFimPrevista, " +
+                             "quilometragemInicial, valorDiarioContratado, valorParcial " +
+                             "FROM contrato_locacao WHERE idContrato=? AND statusContrato=?";
+            long idVeiculo = -1;
+            long idCliente = -1;
+            LocalDate dataInicioPrevista = null;
+            LocalDate dataFimPrevista = null;
+            int quilometragemInicial = 0;
+            BigDecimal valorDiarioContratado = BigDecimal.ZERO;
+            BigDecimal valorParcial = BigDecimal.ZERO;
+
+            try (PreparedStatement pstmtCheck = conn.prepareStatement(sqlCheck)) {
+                pstmtCheck.setLong(1, idContrato);
+                pstmtCheck.setString(2, StatusContrato.ATIVO.name());
+                try (ResultSet rs = pstmtCheck.executeQuery()) {
+                    if (rs.next()) {
+                        idVeiculo = rs.getLong("idVeiculo");
+                        idCliente = rs.getLong("idCliente");
+                        dataInicioPrevista = LocalDate.parse(rs.getString("dataInicioPrevista"));
+                        dataFimPrevista = LocalDate.parse(rs.getString("dataFimPrevista"));
+                        quilometragemInicial = rs.getInt("quilometragemInicial");
+                        valorDiarioContratado = rs.getBigDecimal("valorDiarioContratado");
+                        valorParcial = rs.getBigDecimal("valorParcial");
+                    } else {
+                        // Contrato não encontrado ou não está no status ATIVO
+                        return false;
+                    }
+                }
+            }
+
+            // Calcular multas e extras
+            LocalDateTime agora = LocalDateTime.now();
+            LocalDate dataAtual = agora.toLocalDate();
+
+            // Calcular dias de atraso (se houver)
+            BigDecimal valorMultas = BigDecimal.ZERO;
+            if (dataAtual.isAfter(dataFimPrevista)) {
+                long diasAtraso = java.time.temporal.ChronoUnit.DAYS.between(dataFimPrevista, dataAtual);
+                valorMultas = valorDiarioMultaAtraso.multiply(BigDecimal.valueOf(diasAtraso));
+            }
+
+            // Calcular quilometragem excedente (se houver)
+            BigDecimal valorExtras = BigDecimal.ZERO;
+            int kmRodados = quilometragemFinal - quilometragemInicial;
+            // Estimativa de km permitidos: 100km por dia
+            long diasPrevistos = java.time.temporal.ChronoUnit.DAYS.between(dataInicioPrevista, dataFimPrevista);
+            if (diasPrevistos == 0) diasPrevistos = 1; // Mínimo de 1 dia
+            int kmPermitidos = (int) (diasPrevistos * 100);
+
+            if (kmRodados > kmPermitidos) {
+                int kmExcedentes = kmRodados - kmPermitidos;
+                valorExtras = valorPorKmExcedente.multiply(BigDecimal.valueOf(kmExcedentes));
+            }
+
+            // Calcular valor total
+            BigDecimal valorTotal = valorParcial.add(valorMultas).add(valorExtras);
+
+            // Atualizar o contrato
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, agora.toString());
+                pstmt.setInt(2, quilometragemFinal);
+                pstmt.setBigDecimal(3, valorMultas);
+                pstmt.setBigDecimal(4, valorExtras);
+                pstmt.setBigDecimal(5, valorTotal);
+                pstmt.setString(6, StatusContrato.ENCERRADO.name());
+                pstmt.setLong(7, idContrato);
+                pstmt.setString(8, StatusContrato.ATIVO.name());
 
                 int linhasAfetadas = pstmt.executeUpdate();
                 if (linhasAfetadas == 0) {

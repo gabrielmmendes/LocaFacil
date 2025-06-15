@@ -10,6 +10,74 @@ import java.util.List;
 
 public class VeiculoDAO {
 
+    /**
+     * Retorna uma lista de veículos com status DISPONIVEL.
+     * 
+     * @return Lista de veículos disponíveis
+     */
+    public List<Veiculo> listarVeiculosDisponiveis() {
+        List<Veiculo> lista = new ArrayList<>();
+        String sql = "SELECT * FROM veiculo WHERE status = ?";
+        try (Connection conn = ConexaoSQLite.conectar()) {
+            assert conn != null;
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, StatusVeiculo.DISPONIVEL.name());
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    while (rs.next()) {
+                        Veiculo v = new Veiculo(
+                                rs.getLong("idVeiculo"),
+                                rs.getString("placa"),
+                                rs.getString("modelo"),
+                                rs.getString("categoria"),
+                                rs.getString("cor"),
+                                rs.getInt("anoFabricacao"),
+                                rs.getBigDecimal("valorDiaria")
+                        );
+                        v.setStatus(StatusVeiculo.valueOf(rs.getString("status")));
+                        lista.add(v);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return lista;
+    }
+
+    /**
+     * Retorna uma lista de veículos com status diferente de DISPONIVEL.
+     * 
+     * @return Lista de veículos não disponíveis (alugados, reservados, etc.)
+     */
+    public List<Veiculo> listarVeiculosNaoDisponiveis() {
+        List<Veiculo> lista = new ArrayList<>();
+        String sql = "SELECT * FROM veiculo WHERE status != ?";
+        try (Connection conn = ConexaoSQLite.conectar()) {
+            assert conn != null;
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, StatusVeiculo.DISPONIVEL.name());
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    while (rs.next()) {
+                        Veiculo v = new Veiculo(
+                                rs.getLong("idVeiculo"),
+                                rs.getString("placa"),
+                                rs.getString("modelo"),
+                                rs.getString("categoria"),
+                                rs.getString("cor"),
+                                rs.getInt("anoFabricacao"),
+                                rs.getBigDecimal("valorDiaria")
+                        );
+                        v.setStatus(StatusVeiculo.valueOf(rs.getString("status")));
+                        lista.add(v);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return lista;
+    }
+
     public void criarTabela() {
         String sql = "CREATE TABLE IF NOT EXISTS veiculo (" +
                 "idVeiculo INTEGER PRIMARY KEY AUTOINCREMENT," +

@@ -10,11 +10,13 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.GridLayout;
 import java.awt.BorderLayout;
+import java.awt.FlowLayout;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Map;
 
 public class LocaFacilApplication extends JFrame {
     // Cliente fields
@@ -42,6 +44,19 @@ public class LocaFacilApplication extends JFrame {
 
     // Tabs
     private JTabbedPane tabbedPane;
+
+    // Relatórios
+    private JTable tabelaVeiculosDisponiveis;
+    private DefaultTableModel modeloTabelaVeiculosDisponiveis;
+    private JTable tabelaVeiculosNaoDisponiveis;
+    private DefaultTableModel modeloTabelaVeiculosNaoDisponiveis;
+    private JTable tabelaLocacoesAtivas;
+    private DefaultTableModel modeloTabelaLocacoesAtivas;
+    private JTable tabelaHistoricoCliente;
+    private DefaultTableModel modeloTabelaHistoricoCliente;
+    private JComboBox<Cliente> comboClientesHistorico;
+    private JTextField txtDataInicioFaturamento, txtDataFimFaturamento;
+    private JLabel lblValorBruto, lblValorMultas, lblValorExtras, lblValorTotalFaturamento;
 
     public LocaFacilApplication() {
         super("Sistema Loca Fácil");
@@ -208,19 +223,130 @@ public class LocaFacilApplication extends JFrame {
         // Painel de botões para operações com reservas
         JPanel painelBotoesReserva = new JPanel();
         JButton btnRegistrarRetirada = new JButton("Registrar Retirada");
+        JButton btnRegistrarDevolucao = new JButton("Registrar Devolução");
         JButton btnCancelarReserva = new JButton("Cancelar Reserva");
         painelBotoesReserva.add(btnRegistrarRetirada);
+        painelBotoesReserva.add(btnRegistrarDevolucao);
         painelBotoesReserva.add(btnCancelarReserva);
         painelReservas.add(painelBotoesReserva, BorderLayout.SOUTH);
 
         // Configurar listeners para os novos botões
         btnRegistrarRetirada.addActionListener(e -> registrarRetiradaVeiculo());
+        btnRegistrarDevolucao.addActionListener(e -> registrarDevolucaoVeiculo());
         btnCancelarReserva.addActionListener(e -> cancelarReserva());
 
-        // Adicionar painéis ao tabbedPane
+        // Painel de Relatórios
+        JPanel painelRelatorios = new JPanel(new BorderLayout());
+
+        // Criar um painel com abas para os diferentes tipos de relatórios
+        JTabbedPane tabbedPaneRelatorios = new JTabbedPane();
+
+        // 1. Relatório de Veículos Disponíveis
+        JPanel painelVeiculosDisponiveis = new JPanel(new BorderLayout());
+        JButton btnAtualizarVeiculosDisponiveis = new JButton("Atualizar Relatório");
+        painelVeiculosDisponiveis.add(btnAtualizarVeiculosDisponiveis, BorderLayout.NORTH);
+
+        modeloTabelaVeiculosDisponiveis = new DefaultTableModel(
+            new String[]{"ID", "Placa", "Modelo", "Categoria", "Cor", "Ano", "Valor Diária"}, 0);
+        tabelaVeiculosDisponiveis = new JTable(modeloTabelaVeiculosDisponiveis);
+        painelVeiculosDisponiveis.add(new JScrollPane(tabelaVeiculosDisponiveis), BorderLayout.CENTER);
+
+        // 2. Relatório de Veículos Não Disponíveis
+        JPanel painelVeiculosNaoDisponiveis = new JPanel(new BorderLayout());
+        JButton btnAtualizarVeiculosNaoDisponiveis = new JButton("Atualizar Relatório");
+        painelVeiculosNaoDisponiveis.add(btnAtualizarVeiculosNaoDisponiveis, BorderLayout.NORTH);
+
+        modeloTabelaVeiculosNaoDisponiveis = new DefaultTableModel(
+            new String[]{"ID", "Placa", "Modelo", "Categoria", "Cor", "Ano", "Valor Diária", "Status"}, 0);
+        tabelaVeiculosNaoDisponiveis = new JTable(modeloTabelaVeiculosNaoDisponiveis);
+        painelVeiculosNaoDisponiveis.add(new JScrollPane(tabelaVeiculosNaoDisponiveis), BorderLayout.CENTER);
+
+        // 3. Relatório de Locações Ativas
+        JPanel painelLocacoesAtivas = new JPanel(new BorderLayout());
+        JButton btnAtualizarLocacoesAtivas = new JButton("Atualizar Relatório");
+        painelLocacoesAtivas.add(btnAtualizarLocacoesAtivas, BorderLayout.NORTH);
+
+        modeloTabelaLocacoesAtivas = new DefaultTableModel(
+            new String[]{"ID", "Cliente", "Veículo", "Data Início", "Data Fim", "Status"}, 0);
+        tabelaLocacoesAtivas = new JTable(modeloTabelaLocacoesAtivas);
+        painelLocacoesAtivas.add(new JScrollPane(tabelaLocacoesAtivas), BorderLayout.CENTER);
+
+        // 4. Histórico de Locações por Cliente
+        JPanel painelHistoricoCliente = new JPanel(new BorderLayout());
+        JPanel painelFiltroHistorico = new JPanel(new FlowLayout());
+
+        painelFiltroHistorico.add(new JLabel("Cliente:"));
+        comboClientesHistorico = new JComboBox<>();
+        painelFiltroHistorico.add(comboClientesHistorico);
+
+        JButton btnConsultarHistorico = new JButton("Consultar Histórico");
+        painelFiltroHistorico.add(btnConsultarHistorico);
+
+        painelHistoricoCliente.add(painelFiltroHistorico, BorderLayout.NORTH);
+
+        modeloTabelaHistoricoCliente = new DefaultTableModel(
+            new String[]{"ID", "Veículo", "Data Início", "Data Fim", "Valor", "Status"}, 0);
+        tabelaHistoricoCliente = new JTable(modeloTabelaHistoricoCliente);
+        painelHistoricoCliente.add(new JScrollPane(tabelaHistoricoCliente), BorderLayout.CENTER);
+
+        // 5. Relatório de Faturamento
+        JPanel painelFaturamento = new JPanel(new BorderLayout());
+        JPanel painelFiltroFaturamento = new JPanel(new GridLayout(3, 2));
+
+        painelFiltroFaturamento.add(new JLabel("Data Início (dd/mm/aaaa):"));
+        txtDataInicioFaturamento = new JTextField();
+        painelFiltroFaturamento.add(txtDataInicioFaturamento);
+
+        painelFiltroFaturamento.add(new JLabel("Data Fim (dd/mm/aaaa):"));
+        txtDataFimFaturamento = new JTextField();
+        painelFiltroFaturamento.add(txtDataFimFaturamento);
+
+        JButton btnGerarRelatorioFaturamento = new JButton("Gerar Relatório");
+        painelFiltroFaturamento.add(btnGerarRelatorioFaturamento);
+
+        painelFaturamento.add(painelFiltroFaturamento, BorderLayout.NORTH);
+
+        JPanel painelResultadoFaturamento = new JPanel(new GridLayout(4, 2));
+        painelResultadoFaturamento.add(new JLabel("Valor Bruto:"));
+        lblValorBruto = new JLabel("R$ 0,00");
+        painelResultadoFaturamento.add(lblValorBruto);
+
+        painelResultadoFaturamento.add(new JLabel("Valor Multas:"));
+        lblValorMultas = new JLabel("R$ 0,00");
+        painelResultadoFaturamento.add(lblValorMultas);
+
+        painelResultadoFaturamento.add(new JLabel("Valor Extras:"));
+        lblValorExtras = new JLabel("R$ 0,00");
+        painelResultadoFaturamento.add(lblValorExtras);
+
+        painelResultadoFaturamento.add(new JLabel("Valor Total:"));
+        lblValorTotalFaturamento = new JLabel("R$ 0,00");
+        painelResultadoFaturamento.add(lblValorTotalFaturamento);
+
+        painelFaturamento.add(painelResultadoFaturamento, BorderLayout.CENTER);
+
+        // Adicionar os painéis de relatórios ao tabbedPane de relatórios
+        tabbedPaneRelatorios.addTab("Veículos Disponíveis", painelVeiculosDisponiveis);
+        tabbedPaneRelatorios.addTab("Veículos Não Disponíveis", painelVeiculosNaoDisponiveis);
+        tabbedPaneRelatorios.addTab("Locações Ativas", painelLocacoesAtivas);
+        tabbedPaneRelatorios.addTab("Histórico por Cliente", painelHistoricoCliente);
+        tabbedPaneRelatorios.addTab("Faturamento", painelFaturamento);
+
+        // Adicionar o tabbedPane de relatórios ao painel principal de relatórios
+        painelRelatorios.add(tabbedPaneRelatorios, BorderLayout.CENTER);
+
+        // Configurar listeners para os botões de relatórios
+        btnAtualizarVeiculosDisponiveis.addActionListener(e -> carregarRelatorioVeiculosDisponiveis());
+        btnAtualizarVeiculosNaoDisponiveis.addActionListener(e -> carregarRelatorioVeiculosNaoDisponiveis());
+        btnAtualizarLocacoesAtivas.addActionListener(e -> carregarRelatorioLocacoesAtivas());
+        btnConsultarHistorico.addActionListener(e -> consultarHistoricoCliente());
+        btnGerarRelatorioFaturamento.addActionListener(e -> gerarRelatorioFaturamento());
+
+        // Adicionar painéis ao tabbedPane principal
         tabbedPane.addTab("Clientes", painelClientes);
         tabbedPane.addTab("Veículos", painelVeiculos);
         tabbedPane.addTab("Reservas", painelReservas);
+        tabbedPane.addTab("Relatórios", painelRelatorios);
 
         // Adicionar tabbedPane ao frame
         add(tabbedPane, BorderLayout.CENTER);
@@ -243,6 +369,11 @@ public class LocaFacilApplication extends JFrame {
             if (tabbedPane.getSelectedIndex() == 2) { // Aba de Reservas
                 carregarCombosReserva();
                 carregarReservas();
+            } else if (tabbedPane.getSelectedIndex() == 3) { // Aba de Relatórios
+                carregarComboClientesHistorico();
+                carregarRelatorioVeiculosDisponiveis();
+                carregarRelatorioVeiculosNaoDisponiveis();
+                carregarRelatorioLocacoesAtivas();
             }
         });
 
@@ -756,6 +887,229 @@ public class LocaFacilApplication extends JFrame {
             JOptionPane.showMessageDialog(this, 
                 "Selecione uma reserva na tabela para cancelar.", 
                 "Aviso", JOptionPane.WARNING_MESSAGE);
+        }
+    }
+
+    /**
+     * Registra a devolução de um veículo pelo cliente, atualizando a quilometragem final,
+     * registrando observações de danos, calculando multas e extras, e alterando o status
+     * do contrato para ENCERRADO e do veículo para DISPONIVEL.
+     */
+    private void registrarDevolucaoVeiculo() {
+        int linhaSelecionada = tabelaReservas.getSelectedRow();
+        if (linhaSelecionada >= 0) {
+            // Verificar se o contrato está no status ATIVO
+            String statusContrato = modeloTabelaReservas.getValueAt(linhaSelecionada, 7).toString();
+            if (!statusContrato.equals("ATIVO")) {
+                JOptionPane.showMessageDialog(this, 
+                    "Apenas contratos com status ATIVO podem ter a devolução registrada.", 
+                    "Operação não permitida", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            // Obter ID do contrato selecionado
+            Long idContrato = (Long) modeloTabelaReservas.getValueAt(linhaSelecionada, 0);
+
+            // Criar um painel para coletar as informações de devolução
+            JPanel panel = new JPanel(new GridLayout(0, 1));
+
+            // Campo para quilometragem final
+            JTextField quilometragemField = new JTextField();
+            panel.add(new JLabel("Quilometragem Final:"));
+            panel.add(quilometragemField);
+
+            // Campo para observações de danos
+            JTextArea observacoesArea = new JTextArea(3, 20);
+            observacoesArea.setLineWrap(true);
+            JScrollPane scrollPane = new JScrollPane(observacoesArea);
+            panel.add(new JLabel("Observações de Danos (opcional):"));
+            panel.add(scrollPane);
+
+            // Campos para valores de multas
+            JTextField valorMultaAtrasoField = new JTextField("50.00");  // Valor padrão
+            panel.add(new JLabel("Valor Diário de Multa por Atraso (R$):"));
+            panel.add(valorMultaAtrasoField);
+
+            JTextField valorKmExcedenteField = new JTextField("1.50");  // Valor padrão
+            panel.add(new JLabel("Valor por Km Excedente (R$):"));
+            panel.add(valorKmExcedenteField);
+
+            // Mostrar o diálogo
+            int resultado = JOptionPane.showConfirmDialog(this, panel, 
+                    "Registrar Devolução de Veículo", JOptionPane.OK_CANCEL_OPTION);
+
+            if (resultado == JOptionPane.OK_OPTION) {
+                try {
+                    // Validar e converter os valores
+                    int quilometragemFinal = Integer.parseInt(quilometragemField.getText().trim());
+                    if (quilometragemFinal < 0) {
+                        throw new NumberFormatException("Quilometragem não pode ser negativa");
+                    }
+
+                    BigDecimal valorDiarioMultaAtraso = new BigDecimal(valorMultaAtrasoField.getText().trim());
+                    BigDecimal valorPorKmExcedente = new BigDecimal(valorKmExcedenteField.getText().trim());
+
+                    String observacoesDanos = observacoesArea.getText().trim();
+
+                    // Confirmar a operação
+                    int resposta = JOptionPane.showConfirmDialog(this,
+                        "Confirma a devolução do veículo com quilometragem " + quilometragemFinal + "?",
+                        "Confirmar Devolução", JOptionPane.YES_NO_OPTION);
+
+                    if (resposta == JOptionPane.YES_OPTION) {
+                        // Registrar a devolução
+                        boolean sucesso = contratoLocacaoDAO.registrarDevolucao(
+                            idContrato, quilometragemFinal, observacoesDanos, 
+                            valorDiarioMultaAtraso, valorPorKmExcedente);
+
+                        if (sucesso) {
+                            // Atualizar tabelas e combos
+                            carregarReservas();
+                            carregarVeiculos(); // Atualizar lista de veículos (status alterado para DISPONIVEL)
+                            carregarCombosReserva(); // Atualizar combos (veículo disponível novamente)
+
+                            JOptionPane.showMessageDialog(this, 
+                                "Devolução do veículo registrada com sucesso!", 
+                                "Sucesso", JOptionPane.INFORMATION_MESSAGE);
+                        } else {
+                            JOptionPane.showMessageDialog(this, 
+                                "Não foi possível registrar a devolução do veículo.", 
+                                "Erro", JOptionPane.ERROR_MESSAGE);
+                        }
+                    }
+                } catch (NumberFormatException e) {
+                    JOptionPane.showMessageDialog(this, 
+                        "Valores inválidos. Verifique os campos numéricos.", 
+                        "Erro de Validação", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        } else {
+            JOptionPane.showMessageDialog(this, 
+                "Selecione um contrato na tabela para registrar a devolução.", 
+                "Aviso", JOptionPane.WARNING_MESSAGE);
+        }
+    }
+
+    /**
+     * Carrega o relatório de veículos disponíveis.
+     */
+    private void carregarRelatorioVeiculosDisponiveis() {
+        modeloTabelaVeiculosDisponiveis.setRowCount(0);
+        List<Veiculo> veiculos = veiculoDAO.listarVeiculosDisponiveis();
+        for (Veiculo v : veiculos) {
+            modeloTabelaVeiculosDisponiveis.addRow(new Object[]{
+                    v.getId(), v.getPlaca(), v.getModelo(),
+                    v.getCategoria(), v.getCor(), v.getAnoFabricacao(),
+                    v.getValorDiaria()
+            });
+        }
+    }
+
+    /**
+     * Carrega o relatório de veículos não disponíveis.
+     */
+    private void carregarRelatorioVeiculosNaoDisponiveis() {
+        modeloTabelaVeiculosNaoDisponiveis.setRowCount(0);
+        List<Veiculo> veiculos = veiculoDAO.listarVeiculosNaoDisponiveis();
+        for (Veiculo v : veiculos) {
+            modeloTabelaVeiculosNaoDisponiveis.addRow(new Object[]{
+                    v.getId(), v.getPlaca(), v.getModelo(),
+                    v.getCategoria(), v.getCor(), v.getAnoFabricacao(),
+                    v.getValorDiaria(), v.getStatus()
+            });
+        }
+    }
+
+    /**
+     * Carrega o relatório de locações ativas.
+     */
+    private void carregarRelatorioLocacoesAtivas() {
+        modeloTabelaLocacoesAtivas.setRowCount(0);
+        List<ContratoLocacao> contratos = contratoLocacaoDAO.listarLocacoesAtivas();
+        for (ContratoLocacao c : contratos) {
+            modeloTabelaLocacoesAtivas.addRow(new Object[]{
+                    c.getId(),
+                    c.getCliente().getNome(),
+                    c.getVeiculo().getModelo() + " (" + c.getVeiculo().getPlaca() + ")",
+                    c.getDataInicioPrevista().format(dateFormatter),
+                    c.getDataFimPrevista().format(dateFormatter),
+                    c.getStatusContrato()
+            });
+        }
+    }
+
+    /**
+     * Carrega o combo de clientes para o histórico e atualiza o combo quando a aba de relatórios é selecionada.
+     */
+    private void carregarComboClientesHistorico() {
+        comboClientesHistorico.removeAllItems();
+        List<Cliente> clientes = clienteDAO.listarTodos();
+        for (Cliente cliente : clientes) {
+            comboClientesHistorico.addItem(cliente);
+        }
+    }
+
+    /**
+     * Consulta o histórico de locações de um cliente específico.
+     */
+    private void consultarHistoricoCliente() {
+        Cliente cliente = (Cliente) comboClientesHistorico.getSelectedItem();
+        if (cliente == null) {
+            JOptionPane.showMessageDialog(this, 
+                "Selecione um cliente para consultar o histórico.", 
+                "Aviso", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        modeloTabelaHistoricoCliente.setRowCount(0);
+        List<ContratoLocacao> contratos = contratoLocacaoDAO.listarHistoricoCliente(cliente.getId());
+        for (ContratoLocacao c : contratos) {
+            modeloTabelaHistoricoCliente.addRow(new Object[]{
+                    c.getId(),
+                    c.getVeiculo().getModelo() + " (" + c.getVeiculo().getPlaca() + ")",
+                    c.getDataInicioPrevista().format(dateFormatter),
+                    c.getDataFimPrevista().format(dateFormatter),
+                    c.getValorParcial(),
+                    c.getStatusContrato()
+            });
+        }
+    }
+
+    /**
+     * Gera o relatório de faturamento para um período específico.
+     */
+    private void gerarRelatorioFaturamento() {
+        try {
+            // Obter datas
+            LocalDate dataInicio = LocalDate.parse(txtDataInicioFaturamento.getText(), dateFormatter);
+            LocalDate dataFim = LocalDate.parse(txtDataFimFaturamento.getText(), dateFormatter);
+
+            // Validar datas
+            if (dataFim.isBefore(dataInicio)) {
+                JOptionPane.showMessageDialog(this, 
+                    "A data de término deve ser posterior à data de início.", 
+                    "Erro de Validação", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            // Gerar relatório
+            Map<String, BigDecimal> resultado = contratoLocacaoDAO.gerarRelatorioFaturamento(dataInicio, dataFim);
+
+            // Exibir resultados
+            lblValorBruto.setText("R$ " + resultado.get("valorBruto").toString());
+            lblValorMultas.setText("R$ " + resultado.get("valorMultas").toString());
+            lblValorExtras.setText("R$ " + resultado.get("valorExtras").toString());
+            lblValorTotalFaturamento.setText("R$ " + resultado.get("valorTotal").toString());
+
+        } catch (DateTimeParseException e) {
+            JOptionPane.showMessageDialog(this, 
+                "Formato de data inválido. Use dd/mm/aaaa.", 
+                "Erro de Validação", JOptionPane.ERROR_MESSAGE);
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, 
+                "Erro ao gerar relatório: " + e.getMessage(), 
+                "Erro", JOptionPane.ERROR_MESSAGE);
+            e.printStackTrace();
         }
     }
 

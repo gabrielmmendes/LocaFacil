@@ -23,6 +23,7 @@ public class ContratoLocacao {
     private BigDecimal valorTotal;
     private StatusContrato statusContrato;
     private List<MultaExtra> multasExtras = new ArrayList<>();
+    private String observacoesDanos;
 
     public ContratoLocacao(Long id, Cliente cliente, Veiculo veiculo, LocalDate dataInicioPrev, LocalDate dataFimPrev, int quilometragemInicial, BigDecimal valorDiario) {
         this.idContrato = id;
@@ -84,5 +85,7 @@ public class ContratoLocacao {
     public void setStatusContrato(StatusContrato s) { statusContrato = s; }
     public void adicionarMultaExtra(MultaExtra m) { multasExtras.add(m); }
     public List<MultaExtra> getMultasExtras() { return multasExtras; }
+    public String getObservacoesDanos() { return observacoesDanos; }
+    public void setObservacoesDanos(String obs) { observacoesDanos = obs; }
     public String toString() { return "Contrato " + idContrato + " - Cliente: " + cliente.getNome(); }
 }
