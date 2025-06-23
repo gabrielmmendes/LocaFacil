@@ -170,6 +170,16 @@ public class LocaFacilApplication extends JFrame {
         tabelaVeiculos = new JTable(modeloTabelaVeiculos);
         painelVeiculos.add(new JScrollPane(tabelaVeiculos), BorderLayout.CENTER);
 
+        // Painel de botões para gerenciamento de status de veículos
+        JPanel painelBotoesStatus = new JPanel();
+        JButton btnManutencao = new JButton("Marcar Em Manutenção");
+        JButton btnForaFrota = new JButton("Marcar Fora de Frota");
+        JButton btnDisponivel = new JButton("Marcar Disponível");
+        painelBotoesStatus.add(btnManutencao);
+        painelBotoesStatus.add(btnForaFrota);
+        painelBotoesStatus.add(btnDisponivel);
+        painelVeiculos.add(painelBotoesStatus, BorderLayout.SOUTH);
+
         // Painel de Reservas (Contratos de Locação)
         JPanel painelReservas = new JPanel(new BorderLayout());
 
@@ -225,15 +235,18 @@ public class LocaFacilApplication extends JFrame {
         JButton btnRegistrarRetirada = new JButton("Registrar Retirada");
         JButton btnRegistrarDevolucao = new JButton("Registrar Devolução");
         JButton btnCancelarReserva = new JButton("Cancelar Reserva");
+        JButton btnCancelarContratoAtivo = new JButton("Cancelar Contrato Ativo");
         painelBotoesReserva.add(btnRegistrarRetirada);
         painelBotoesReserva.add(btnRegistrarDevolucao);
         painelBotoesReserva.add(btnCancelarReserva);
+        painelBotoesReserva.add(btnCancelarContratoAtivo);
         painelReservas.add(painelBotoesReserva, BorderLayout.SOUTH);
 
         // Configurar listeners para os novos botões
         btnRegistrarRetirada.addActionListener(e -> registrarRetiradaVeiculo());
         btnRegistrarDevolucao.addActionListener(e -> registrarDevolucaoVeiculo());
         btnCancelarReserva.addActionListener(e -> cancelarReserva());
+        btnCancelarContratoAtivo.addActionListener(e -> cancelarContratoAtivo());
 
         // Painel de Relatórios
         JPanel painelRelatorios = new JPanel(new BorderLayout());
@@ -359,6 +372,11 @@ public class LocaFacilApplication extends JFrame {
         btnSalvarVeiculo.addActionListener(e -> salvarVeiculo());
         btnAtualizarVeiculos.addActionListener(e -> carregarVeiculos());
         btnExcluirVeiculo.addActionListener(e -> excluirVeiculo());
+
+        // Configurar listeners para os botões de status de veículos
+        btnManutencao.addActionListener(e -> alterarStatusVeiculo(StatusVeiculo.EM_MANUTENCAO));
+        btnForaFrota.addActionListener(e -> alterarStatusVeiculo(StatusVeiculo.FORA_FROTA));
+        btnDisponivel.addActionListener(e -> alterarStatusVeiculo(StatusVeiculo.DISPONIVEL));
 
         btnCalcularValor.addActionListener(e -> calcularValorReserva());
         btnCriarReserva.addActionListener(e -> criarReserva());
@@ -891,6 +909,98 @@ public class LocaFacilApplication extends JFrame {
     }
 
     /**
+     * Cancela um contrato ativo (devolução antecipada), calculando multa se aplicável,
+     * alterando o status do contrato para CANCELADO e o status do veículo para DISPONIVEL.
+     */
+    private void cancelarContratoAtivo() {
+        int linhaSelecionada = tabelaReservas.getSelectedRow();
+        if (linhaSelecionada >= 0) {
+            // Verificar se o contrato está no status ATIVO
+            String statusContrato = modeloTabelaReservas.getValueAt(linhaSelecionada, 7).toString();
+            if (!statusContrato.equals("ATIVO")) {
+                JOptionPane.showMessageDialog(this, 
+                    "Apenas contratos com status ATIVO podem ser cancelados.", 
+                    "Operação não permitida", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            // Obter ID do contrato selecionado
+            Long idContrato = (Long) modeloTabelaReservas.getValueAt(linhaSelecionada, 0);
+
+            // Criar um painel para coletar as informações de cancelamento
+            JPanel panel = new JPanel(new GridLayout(0, 1));
+
+            // Campo para quilometragem final
+            JTextField quilometragemField = new JTextField();
+            panel.add(new JLabel("Quilometragem Final:"));
+            panel.add(quilometragemField);
+
+            // Campo para observações de danos
+            JTextArea observacoesArea = new JTextArea(3, 20);
+            observacoesArea.setLineWrap(true);
+            JScrollPane scrollPane = new JScrollPane(observacoesArea);
+            panel.add(new JLabel("Observações de Danos (opcional):"));
+            panel.add(scrollPane);
+
+            // Campo para valor da multa por cancelamento antecipado
+            JTextField valorMultaField = new JTextField("100.00");  // Valor padrão
+            panel.add(new JLabel("Valor da Multa por Cancelamento Antecipado (R$):"));
+            panel.add(valorMultaField);
+
+            // Mostrar o diálogo
+            int resultado = JOptionPane.showConfirmDialog(this, panel, 
+                    "Cancelar Contrato Ativo", JOptionPane.OK_CANCEL_OPTION);
+
+            if (resultado == JOptionPane.OK_OPTION) {
+                try {
+                    // Validar e converter os valores
+                    int quilometragemFinal = Integer.parseInt(quilometragemField.getText().trim());
+                    if (quilometragemFinal < 0) {
+                        throw new NumberFormatException("Quilometragem não pode ser negativa");
+                    }
+
+                    BigDecimal valorMulta = new BigDecimal(valorMultaField.getText().trim());
+                    String observacoesDanos = observacoesArea.getText().trim();
+
+                    // Confirmar a operação
+                    int resposta = JOptionPane.showConfirmDialog(this,
+                        "Confirma o cancelamento do contrato com quilometragem " + quilometragemFinal + "?",
+                        "Confirmar Cancelamento", JOptionPane.YES_NO_OPTION);
+
+                    if (resposta == JOptionPane.YES_OPTION) {
+                        // Cancelar o contrato
+                        boolean sucesso = contratoLocacaoDAO.cancelarContratoAtivo(
+                            idContrato, quilometragemFinal, observacoesDanos, valorMulta);
+
+                        if (sucesso) {
+                            // Atualizar tabelas e combos
+                            carregarReservas();
+                            carregarVeiculos(); // Atualizar lista de veículos (status alterado para DISPONIVEL)
+                            carregarCombosReserva(); // Atualizar combos (veículo disponível novamente)
+
+                            JOptionPane.showMessageDialog(this, 
+                                "Contrato cancelado com sucesso!", 
+                                "Sucesso", JOptionPane.INFORMATION_MESSAGE);
+                        } else {
+                            JOptionPane.showMessageDialog(this, 
+                                "Não foi possível cancelar o contrato.", 
+                                "Erro", JOptionPane.ERROR_MESSAGE);
+                        }
+                    }
+                } catch (NumberFormatException e) {
+                    JOptionPane.showMessageDialog(this, 
+                        "Por favor, insira valores numéricos válidos para quilometragem e multa.", 
+                        "Erro de Validação", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        } else {
+            JOptionPane.showMessageDialog(this, 
+                "Selecione um contrato na tabela para cancelar.", 
+                "Aviso", JOptionPane.WARNING_MESSAGE);
+        }
+    }
+
+    /**
      * Registra a devolução de um veículo pelo cliente, atualizando a quilometragem final,
      * registrando observações de danos, calculando multas e extras, e alterando o status
      * do contrato para ENCERRADO e do veículo para DISPONIVEL.
@@ -1110,6 +1220,66 @@ public class LocaFacilApplication extends JFrame {
                 "Erro ao gerar relatório: " + e.getMessage(), 
                 "Erro", JOptionPane.ERROR_MESSAGE);
             e.printStackTrace();
+        }
+    }
+
+    /**
+     * Altera o status de um veículo selecionado na tabela.
+     * 
+     * @param novoStatus O novo status a ser atribuído ao veículo
+     */
+    private void alterarStatusVeiculo(StatusVeiculo novoStatus) {
+        int linhaSelecionada = tabelaVeiculos.getSelectedRow();
+        if (linhaSelecionada >= 0) {
+            // Obter ID e status atual do veículo selecionado
+            Long idVeiculo = (Long) modeloTabelaVeiculos.getValueAt(linhaSelecionada, 0);
+            StatusVeiculo statusAtual = (StatusVeiculo) modeloTabelaVeiculos.getValueAt(linhaSelecionada, 7);
+
+            // Verificar se o veículo está alugado ou reservado
+            if (statusAtual == StatusVeiculo.ALUGADO || statusAtual == StatusVeiculo.RESERVADO) {
+                JOptionPane.showMessageDialog(this, 
+                    "Não é possível alterar o status de um veículo que está alugado ou reservado.", 
+                    "Operação não permitida", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            // Confirmar a alteração de status
+            int resposta = JOptionPane.showConfirmDialog(this,
+                "Tem certeza que deseja alterar o status do veículo para " + novoStatus + "?",
+                "Confirmar Alteração de Status", JOptionPane.YES_NO_OPTION);
+
+            if (resposta == JOptionPane.YES_OPTION) {
+                try {
+                    // Obter o veículo completo do banco de dados
+                    List<Veiculo> veiculos = veiculoDAO.listarTodos();
+                    Veiculo veiculo = veiculos.stream()
+                        .filter(v -> v.getId().equals(idVeiculo))
+                        .findFirst()
+                        .orElse(null);
+
+                    if (veiculo != null) {
+                        // Atualizar o status do veículo
+                        veiculo.setStatus(novoStatus);
+                        veiculoDAO.atualizar(veiculo);
+
+                        // Atualizar a tabela
+                        carregarVeiculos();
+
+                        JOptionPane.showMessageDialog(this, 
+                            "Status do veículo alterado com sucesso para " + novoStatus + "!", 
+                            "Sucesso", JOptionPane.INFORMATION_MESSAGE);
+                    }
+                } catch (Exception e) {
+                    JOptionPane.showMessageDialog(this, 
+                        "Erro ao alterar status do veículo: " + e.getMessage(), 
+                        "Erro", JOptionPane.ERROR_MESSAGE);
+                    e.printStackTrace();
+                }
+            }
+        } else {
+            JOptionPane.showMessageDialog(this, 
+                "Selecione um veículo na tabela para alterar seu status.", 
+                "Aviso", JOptionPane.WARNING_MESSAGE);
         }
     }
 

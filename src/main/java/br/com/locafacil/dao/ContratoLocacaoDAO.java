@@ -476,6 +476,113 @@ public class ContratoLocacaoDAO {
     }
 
     /**
+     * Cancela um contrato ativo (devolução antecipada), calculando multa se aplicável,
+     * alterando o status do contrato para CANCELADO e o status do veículo para DISPONIVEL.
+     * 
+     * @param idContrato ID do contrato a ser cancelado
+     * @param quilometragemFinal Quilometragem final do veículo no momento da devolução
+     * @param observacoesDanos Observações sobre danos no veículo (opcional)
+     * @param valorMultaDevolucaoAntecipada Valor da multa por devolução antecipada (se aplicável)
+     * @return true se a operação foi bem-sucedida, false caso contrário
+     */
+    public boolean cancelarContratoAtivo(long idContrato, int quilometragemFinal, String observacoesDanos, 
+                                        BigDecimal valorMultaDevolucaoAntecipada) {
+        String sql = "UPDATE contrato_locacao SET dataDevolucao=?, quilometragemFinal=?, " +
+                     "valorMultas=?, valorTotal=?, statusContrato=? " +
+                     "WHERE idContrato=? AND statusContrato=?";
+
+        try (Connection conn = ConexaoSQLite.conectar()) {
+            assert conn != null;
+
+            // Primeiro, verificar se o contrato existe e está no status ATIVO
+            String sqlCheck = "SELECT idVeiculo, idCliente, dataInicioPrevista, dataFimPrevista, " +
+                             "quilometragemInicial, valorDiarioContratado, valorParcial " +
+                             "FROM contrato_locacao WHERE idContrato=? AND statusContrato=?";
+            long idVeiculo = -1;
+            long idCliente = -1;
+            LocalDate dataInicioPrevista = null;
+            LocalDate dataFimPrevista = null;
+            int quilometragemInicial = 0;
+            BigDecimal valorDiarioContratado = BigDecimal.ZERO;
+            BigDecimal valorParcial = BigDecimal.ZERO;
+
+            try (PreparedStatement pstmtCheck = conn.prepareStatement(sqlCheck)) {
+                pstmtCheck.setLong(1, idContrato);
+                pstmtCheck.setString(2, StatusContrato.ATIVO.name());
+                try (ResultSet rs = pstmtCheck.executeQuery()) {
+                    if (rs.next()) {
+                        idVeiculo = rs.getLong("idVeiculo");
+                        idCliente = rs.getLong("idCliente");
+                        dataInicioPrevista = LocalDate.parse(rs.getString("dataInicioPrevista"));
+                        dataFimPrevista = LocalDate.parse(rs.getString("dataFimPrevista"));
+                        quilometragemInicial = rs.getInt("quilometragemInicial");
+                        valorDiarioContratado = rs.getBigDecimal("valorDiarioContratado");
+                        valorParcial = rs.getBigDecimal("valorParcial");
+                    } else {
+                        // Contrato não encontrado ou não está no status ATIVO
+                        return false;
+                    }
+                }
+            }
+
+            // Calcular multa por devolução antecipada
+            LocalDateTime agora = LocalDateTime.now();
+            LocalDate dataAtual = agora.toLocalDate();
+
+            // Calcular dias utilizados
+            long diasUtilizados = java.time.temporal.ChronoUnit.DAYS.between(dataInicioPrevista, dataAtual);
+            if (diasUtilizados == 0) diasUtilizados = 1; // Mínimo de 1 dia
+
+            // Calcular dias contratados
+            long diasContratados = java.time.temporal.ChronoUnit.DAYS.between(dataInicioPrevista, dataFimPrevista);
+            if (diasContratados == 0) diasContratados = 1; // Mínimo de 1 dia
+
+            // Calcular valor proporcional aos dias utilizados
+            BigDecimal valorProporcional = valorDiarioContratado.multiply(BigDecimal.valueOf(diasUtilizados));
+
+            // Calcular multa (se aplicável)
+            BigDecimal valorMulta = BigDecimal.ZERO;
+            if (valorMultaDevolucaoAntecipada != null && valorMultaDevolucaoAntecipada.compareTo(BigDecimal.ZERO) > 0) {
+                valorMulta = valorMultaDevolucaoAntecipada;
+            }
+
+            // Calcular valor total (valor proporcional + multa)
+            BigDecimal valorTotal = valorProporcional.add(valorMulta);
+
+            // Atualizar o contrato
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, agora.toString());
+                pstmt.setInt(2, quilometragemFinal);
+                pstmt.setBigDecimal(3, valorMulta);
+                pstmt.setBigDecimal(4, valorTotal);
+                pstmt.setString(5, StatusContrato.CANCELADO.name());
+                pstmt.setLong(6, idContrato);
+                pstmt.setString(7, StatusContrato.ATIVO.name());
+
+                int linhasAfetadas = pstmt.executeUpdate();
+                if (linhasAfetadas == 0) {
+                    // Nenhum contrato foi atualizado
+                    return false;
+                }
+            }
+
+            // Atualizar o status do veículo para DISPONIVEL
+            if (idVeiculo != -1) {
+                Veiculo veiculo = obterVeiculo(idVeiculo);
+                if (veiculo != null) {
+                    veiculo.setStatus(StatusVeiculo.DISPONIVEL);
+                    veiculoDAO.atualizar(veiculo);
+                }
+            }
+
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
      * Registra a devolução do veículo, atualizando a quilometragem final, a data de devolução,
      * calculando multas por atraso e quilometragem excedente, e alterando o status do contrato
      * para ENCERRADO e do veículo para DISPONIVEL.
