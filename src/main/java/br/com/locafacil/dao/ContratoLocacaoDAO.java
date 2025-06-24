@@ -483,17 +483,23 @@ public class ContratoLocacaoDAO {
             assert conn != null;
 
             // Primeiro, verificar se o contrato existe e está no status RESERVA
-            String sqlCheck = "SELECT idVeiculo FROM contrato_locacao WHERE idContrato=? AND statusContrato=?";
+            String sqlCheck = "SELECT idVeiculo, statusContrato FROM contrato_locacao WHERE idContrato=?";
             long idVeiculo = -1;
+            String statusAtual = null;
 
             try (PreparedStatement pstmtCheck = conn.prepareStatement(sqlCheck)) {
                 pstmtCheck.setLong(1, idContrato);
-                pstmtCheck.setString(2, StatusContrato.RESERVA.name());
                 try (ResultSet rs = pstmtCheck.executeQuery()) {
                     if (rs.next()) {
                         idVeiculo = rs.getLong("idVeiculo");
+                        statusAtual = rs.getString("statusContrato");
+
+                        if (!StatusContrato.RESERVA.name().equals(statusAtual)) {
+                            // Contrato não está no status RESERVA
+                            return false;
+                        }
                     } else {
-                        // Contrato não encontrado ou não está no status RESERVA
+                        // Contrato não encontrado
                         return false;
                     }
                 }
