@@ -18,46 +18,198 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Aplicação principal do sistema Loca Fácil para gerenciamento de locação de veículos.
+ * Implementa uma interface gráfica completa para gerenciar clientes, veículos, contratos de locação,
+ * reservas, pagamentos e relatórios.
+ * <p>
+ * A aplicação utiliza o padrão de interface Swing com múltiplas abas para organizar as diferentes
+ * funcionalidades do sistema, permitindo ao usuário realizar todas as operações necessárias
+ * para o gerenciamento de uma locadora de veículos.
+ */
 public class LocaFacilApplication extends JFrame {
     // Cliente fields
+    /**
+     * Campos de texto para entrada de dados do cliente.
+     * txtNome: Nome do cliente
+     * txtCPF: CPF ou CNPJ do cliente
+     * txtTelefone: Telefone de contato do cliente
+     * txtEmail: Email do cliente
+     * txtCNH: Número da CNH do cliente
+     */
     private JTextField txtNome, txtCPF, txtTelefone, txtEmail, txtCNH;
+
+    /**
+     * Tabela para exibição da lista de clientes cadastrados.
+     */
     private JTable tabelaClientes;
+
+    /**
+     * Modelo de dados para a tabela de clientes.
+     */
     private DefaultTableModel modeloTabelaClientes;
+
+    /**
+     * Objeto de acesso a dados para operações com clientes no banco de dados.
+     */
     private ClienteDAO clienteDAO = new ClienteDAO();
 
     // Veiculo fields
+    /**
+     * Campos de texto para entrada de dados do veículo.
+     * txtPlaca: Placa do veículo
+     * txtModelo: Modelo do veículo
+     * txtCategoria: Categoria do veículo
+     * txtCor: Cor do veículo
+     * txtAno: Ano de fabricação do veículo
+     * txtValorDiaria: Valor da diária para locação do veículo
+     */
     private JTextField txtPlaca, txtModelo, txtCategoria, txtCor, txtAno, txtValorDiaria;
+
+    /**
+     * Combobox para seleção do status do veículo.
+     */
     private JComboBox<StatusVeiculo> comboStatus;
+
+    /**
+     * Tabela para exibição da lista de veículos cadastrados.
+     */
     private JTable tabelaVeiculos;
+
+    /**
+     * Modelo de dados para a tabela de veículos.
+     */
     private DefaultTableModel modeloTabelaVeiculos;
+
+    /**
+     * Objeto de acesso a dados para operações com veículos no banco de dados.
+     */
     private VeiculoDAO veiculoDAO = new VeiculoDAO();
 
     // Contrato de Locação (Reserva) fields
+    /**
+     * Combobox para seleção do cliente na criação de contratos.
+     */
     private JComboBox<Cliente> comboClientes;
+
+    /**
+     * Combobox para seleção do veículo na criação de contratos.
+     */
     private JComboBox<Veiculo> comboVeiculos;
+
+    /**
+     * Campos de texto para entrada de dados do contrato.
+     * txtDataInicio: Data de início da locação
+     * txtDataFim: Data de fim da locação
+     * txtQuilometragemInicial: Quilometragem inicial do veículo
+     */
     private JTextField txtDataInicio, txtDataFim, txtQuilometragemInicial;
+
+    /**
+     * Label para exibição do valor parcial calculado para o contrato.
+     */
     private JLabel lblValorParcial;
+
+    /**
+     * Tabela para exibição da lista de reservas/contratos.
+     */
     private JTable tabelaReservas;
+
+    /**
+     * Modelo de dados para a tabela de reservas/contratos.
+     */
     private DefaultTableModel modeloTabelaReservas;
+
+    /**
+     * Objeto de acesso a dados para operações com contratos de locação no banco de dados.
+     */
     private ContratoLocacaoDAO contratoLocacaoDAO = new ContratoLocacaoDAO();
+
+    /**
+     * Formatador de datas para conversão entre String e LocalDate.
+     */
     private DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     // Tabs
+    /**
+     * Painel de abas que organiza as diferentes funcionalidades do sistema.
+     * Contém abas para gerenciamento de clientes, veículos, contratos e relatórios.
+     */
     private JTabbedPane tabbedPane;
 
     // Relatórios
+    /**
+     * Tabela para exibição dos veículos disponíveis para locação.
+     */
     private JTable tabelaVeiculosDisponiveis;
+
+    /**
+     * Modelo de dados para a tabela de veículos disponíveis.
+     */
     private DefaultTableModel modeloTabelaVeiculosDisponiveis;
+
+    /**
+     * Tabela para exibição dos veículos que não estão disponíveis para locação.
+     */
     private JTable tabelaVeiculosNaoDisponiveis;
+
+    /**
+     * Modelo de dados para a tabela de veículos não disponíveis.
+     */
     private DefaultTableModel modeloTabelaVeiculosNaoDisponiveis;
+
+    /**
+     * Tabela para exibição das locações ativas (reservas e contratos em andamento).
+     */
     private JTable tabelaLocacoesAtivas;
+
+    /**
+     * Modelo de dados para a tabela de locações ativas.
+     */
     private DefaultTableModel modeloTabelaLocacoesAtivas;
+
+    /**
+     * Tabela para exibição do histórico de locações de um cliente.
+     */
     private JTable tabelaHistoricoCliente;
+
+    /**
+     * Modelo de dados para a tabela de histórico de cliente.
+     */
     private DefaultTableModel modeloTabelaHistoricoCliente;
+
+    /**
+     * Combobox para seleção do cliente na consulta de histórico.
+     */
     private JComboBox<Cliente> comboClientesHistorico;
+
+    /**
+     * Campos de texto para entrada de datas no relatório de faturamento.
+     * txtDataInicioFaturamento: Data de início do período
+     * txtDataFimFaturamento: Data de fim do período
+     */
     private JTextField txtDataInicioFaturamento, txtDataFimFaturamento;
+
+    /**
+     * Labels para exibição dos valores calculados no relatório de faturamento.
+     * lblValorBruto: Valor bruto faturado no período
+     * lblValorMultas: Valor de multas faturado no período
+     * lblValorExtras: Valor de extras faturado no período
+     * lblValorTotalFaturamento: Valor total faturado no período
+     */
     private JLabel lblValorBruto, lblValorMultas, lblValorExtras, lblValorTotalFaturamento;
 
+    /**
+     * Construtor da aplicação principal.
+     * Inicializa a interface gráfica, configura os componentes visuais,
+     * cria as tabelas no banco de dados e configura os listeners para os eventos da UI.
+     * <p>
+     * A interface é organizada em abas que separam as diferentes funcionalidades:
+     * - Gerenciamento de clientes
+     * - Gerenciamento de veículos
+     * - Contratos e reservas
+     * - Relatórios e estatísticas
+     */
     public LocaFacilApplication() {
         super("Sistema Loca Fácil");
         setSize(800, 500);
@@ -1283,6 +1435,14 @@ public class LocaFacilApplication extends JFrame {
         }
     }
 
+    /**
+     * Método principal que inicia a aplicação.
+     * Utiliza SwingUtilities.invokeLater para garantir que a interface gráfica
+     * seja criada e atualizada na Event Dispatch Thread (EDT) do Swing,
+     * seguindo as melhores práticas para aplicações Swing.
+     *
+     * @param args Argumentos de linha de comando (não utilizados)
+     */
     public static void main(String[] args) {
         SwingUtilities.invokeLater(LocaFacilApplication::new);
     }

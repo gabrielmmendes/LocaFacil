@@ -16,10 +16,24 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Classe responsável pela persistência de dados dos contratos de locação.
+ * Implementa operações de CRUD (Create, Read, Update, Delete) para a entidade ContratoLocacao,
+ * além de funcionalidades específicas como verificação de disponibilidade de veículos,
+ * registro de retirada e devolução, cancelamento de reservas e geração de relatórios.
+ */
 public class ContratoLocacaoDAO {
 
     private ClienteDAO clienteDAO = new ClienteDAO();
     private VeiculoDAO veiculoDAO = new VeiculoDAO();
+
+    /**
+     * Construtor padrão da classe ContratoLocacaoDAO.
+     * Inicializa um novo objeto DAO para operações com contratos de locação.
+     */
+    public ContratoLocacaoDAO() {
+        // Construtor padrão
+    }
 
     /**
      * Lista todas as locações ativas (status = RESERVA ou ATIVO).
@@ -187,6 +201,11 @@ public class ContratoLocacaoDAO {
         return resultado;
     }
 
+    /**
+     * Cria a tabela de contratos de locação no banco de dados se ela não existir.
+     * Define a estrutura da tabela com todas as colunas necessárias para armazenar
+     * informações de contratos, incluindo chaves estrangeiras para clientes e veículos.
+     */
     public void criarTabela() {
         String sql = "CREATE TABLE IF NOT EXISTS contrato_locacao (" +
                 "idContrato INTEGER PRIMARY KEY," +
@@ -217,6 +236,12 @@ public class ContratoLocacaoDAO {
         }
     }
 
+    /**
+     * Insere um novo contrato de locação no banco de dados.
+     * Também atualiza o status do veículo para RESERVADO.
+     * 
+     * @param contrato O objeto ContratoLocacao a ser inserido no banco de dados
+     */
     public void inserir(ContratoLocacao contrato) {
         String sql = "INSERT INTO contrato_locacao(idCliente, idVeiculo, dataInicioPrevista, dataFimPrevista, " +
                 "quilometragemInicial, valorDiarioContratado, valorParcial, statusContrato) " +
@@ -253,6 +278,11 @@ public class ContratoLocacaoDAO {
         }
     }
 
+    /**
+     * Lista todos os contratos de locação cadastrados no banco de dados.
+     * 
+     * @return Uma lista contendo todos os contratos de locação
+     */
     public List<ContratoLocacao> listarTodos() {
         List<ContratoLocacao> lista = new ArrayList<>();
         String sql = "SELECT * FROM contrato_locacao";
@@ -301,6 +331,13 @@ public class ContratoLocacaoDAO {
         return lista;
     }
 
+    /**
+     * Obtém um cliente pelo seu ID.
+     * Implementação simplificada que busca o cliente na lista completa de clientes.
+     * 
+     * @param idCliente ID do cliente a ser buscado
+     * @return O objeto Cliente correspondente ao ID, ou null se não encontrado
+     */
     private Cliente obterCliente(long idCliente) {
         // Implementação simplificada - em uma aplicação real, seria melhor ter um método específico no ClienteDAO
         List<Cliente> clientes = clienteDAO.listarTodos();
@@ -310,6 +347,13 @@ public class ContratoLocacaoDAO {
                 .orElse(null);
     }
 
+    /**
+     * Obtém um veículo pelo seu ID.
+     * Implementação simplificada que busca o veículo na lista completa de veículos.
+     * 
+     * @param idVeiculo ID do veículo a ser buscado
+     * @return O objeto Veiculo correspondente ao ID, ou null se não encontrado
+     */
     private Veiculo obterVeiculo(long idVeiculo) {
         // Implementação simplificada - em uma aplicação real, seria melhor ter um método específico no VeiculoDAO
         List<Veiculo> veiculos = veiculoDAO.listarTodos();
@@ -319,6 +363,15 @@ public class ContratoLocacaoDAO {
                 .orElse(null);
     }
 
+    /**
+     * Verifica se um veículo está disponível para locação em um determinado período.
+     * Verifica tanto o status atual do veículo quanto possíveis sobreposições com outras reservas.
+     * 
+     * @param idVeiculo ID do veículo a ser verificado
+     * @param dataInicio Data de início do período desejado
+     * @param dataFim Data de fim do período desejado
+     * @return true se o veículo estiver disponível no período, false caso contrário
+     */
     public boolean verificarDisponibilidadeVeiculo(long idVeiculo, LocalDate dataInicio, LocalDate dataFim) {
         // Primeiro, verificar se o veículo está com status DISPONIVEL
         Veiculo veiculo = obterVeiculo(idVeiculo);
@@ -699,6 +752,13 @@ public class ContratoLocacaoDAO {
         }
     }
 
+    /**
+     * Exclui um contrato de locação do banco de dados pelo seu ID.
+     * Se o contrato estiver com status RESERVA ou ATIVO, também atualiza o status
+     * do veículo associado para DISPONIVEL.
+     * 
+     * @param id ID do contrato a ser excluído
+     */
     public void excluir(long id) {
         // Primeiro, obter o contrato para verificar o veículo associado
         String sqlSelect = "SELECT idVeiculo, statusContrato FROM contrato_locacao WHERE idContrato=?";

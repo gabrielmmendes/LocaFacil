@@ -40,3 +40,5 @@ build/
 locadora.db
 
 .idea
+
+/java-doc/
