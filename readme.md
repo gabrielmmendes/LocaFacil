@@ -80,7 +80,7 @@ Principais classes:
 
 ## 📦 Diagrama de Classes
 
-![Diagrama de Classes](docs/diagrama-classes.png)
+[Diagrama de Classes](https://docs.google.com/document/d/14D2YnpXCNEougdbkzA2vOsfAeqe4p0DKQ0tbKV-V_p8/edit?usp=sharing)
 
 > Veja `docs/diagrama-classes.png` para detalhes de atributos, métodos e relacionamentos :contentReference[oaicite:8]{index=8}
 
