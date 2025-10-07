@@ -88,7 +88,7 @@ Principais classes:
 
 ## 📦 Modelo entidade-relacionamento de forma gráfica (DER)
 
-![Diagrama DER](https://lucid.app/lucidchart/6b240376-6d87-4e57-b3a1-d03a7d58316e/edit?viewport_loc=-1806%2C-830%2C4037%2C1978%2C0_0&invitationId=inv_8e834b23-3ac3-4963-9556-def1901aabca)
+[🔗 Acessar DER no Lucidchart](https://lucid.app/lucidchart/6b240376-6d87-4e57-b3a1-d03a7d58316e/edit?viewport_loc=-1806%2C-830%2C4037%2C1978%2C0_0&invitationId=inv_8e834b23-3ac3-4963-9556-def1901aabca)
 
 ---
 
